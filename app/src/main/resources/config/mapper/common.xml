@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="common">
+
+	<!-- 메뉴 로그 저장 -->
+	<insert id="menuLogInsert" parameterType="java.util.HashMap">
+		INSERT INTO hpublic00.dbo.USER_USEMNG
+			(LDate
+			,LTime
+			,LInOut
+			,ModuleCd
+			,ModuleNM
+			,LID
+			,LIP)
+		VALUES(
+			#date#
+			,#time#
+			,'1'
+			,'스마트앱'
+			,#module_nm#
+			,#sabun_no#
+			,'스마트폰')
+	</insert>
+	
+	<!-- 메뉴 권한 조회 아이디찾기-->
+	<select id="getAnalyMenuAuth" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT * FROM GET_ANALY_MENUAUTH(#sabun_no#)
+	</select>	
+	
+	<!-- 무재해 -->
+	<select  id="proc_accident_viewK" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call hwinmm.dbo.sp_TW_SAF_View2 ('K') }
+		]]>
+	</select>
+	<select  id="proc_accident_viewP" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call hwinmm.dbo.sp_TW_SAF_View2 ('P') }
+		]]>
+	</select>
+
+</mapper>

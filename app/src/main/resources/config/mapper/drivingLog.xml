@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="drivingLog">
+	<!-- 장비 조회 쿼리 -->
+	<select id="allEquipCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT RTRIM(C001) AS EQUIP_CD
+			,RTRIM(C002) AS EQUIP_NM
+			,C003 AS IDX
+		FROM Hwinmm.dbo.MV1010
+		ORDER BY IDX
+	</select>
+
+	<select id="regEquipCode" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT RTRIM(C001) AS EQUIP_CD,
+			RTRIM(C030) AS CAR_CD,
+			RTRIM(C002) AS EQUIP_NM
+		FROM Hwinmm.dbo.TM0265
+		WHERE C001 = (
+			SELECT T1.EQUIP_CD
+			FROM (
+				SELECT TOP 1 IDX, RTRIM(C001) AS EQUIP_CD
+				FROM Hwinmm.dbo.TM0661
+				WHERE C003 = #userid#
+				ORDER BY C007 DESC
+			) T1
+		)
+	</select>
+
+	<select id="regEquipCodeCnt" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT COUNT(*) AS REG_CNT
+		FROM Hwinmm.dbo.TM0265
+		WHERE C001 = (
+			SELECT T1.EQUIP_CD
+			FROM (
+				SELECT TOP 1 IDX, RTRIM(C001) AS EQUIP_CD
+				FROM Hwinmm.dbo.TM0661
+				WHERE C003 = #userid#
+				ORDER BY C007 DESC
+			) T1
+		)
+	</select>
+
+	<!-- 이전 근무 조 자료 확인 -->
+	<select id="searchPrevData" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT TOP 1 A.IDX
+				,A.EQUIP_CD AS EQUIP_CD
+				,A.WORK_SHIFT AS WORK_SHIFT
+				,A.HR_END_M AS HR_END_M
+				,A.TRANSFER_MEMO AS TRANSFER_MEMO
+		FROM Hwinmm.dbo.EQUIP_DRIVE_RPTM A
+		WHERE A.EQUIP_CD = #eqKey#
+		ORDER BY A.IDX DESC
+	</select>
+
+	<!-- 장비번호 조회 쿼리 -->
+	<select id="equipCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT RTRIM(A.C001) AS EQUIP_CD
+			<!-- ,RIGHT(RTRIM(A.C072), 4) + ' (' + LTRIM(A.C002) + ')' as EQUIP_NM -->
+			,RIGHT(RTRIM(A.C072), 4) + CASE WHEN LTRIM(A.C030) = (SELECT LTRIM(T1.C001) FROM HWINMM.DBO.MV1010 T1 WHERE T1.C005 != '99' AND A.C030 = T1.C001) THEN ' (' + LEFT(LTRIM(A.C002), 3) + ')' ELSE ' (' + LTRIM(A.C002) + ')' END as EQUIP_NM
+			,A.C004 AS MAKE_COMP
+			,(SELECT aaa=SJ_SmartFDB.dbo.fn_TW_EQM_GetInsaNm(A.C001)) AS DRIVER_NM
+			,(SELECT bbb=SJ_SmartFDB.dbo.fn_TW_EQM_GetInsaNo(A.C001)) AS DRIVER_NO
+			,ROW_NUMBER() OVER(ORDER BY A.C001) AS IDX
+		FROM Hwinmm.dbo.TM0265 A
+		WHERE A.C030 = rtrim(#equipCd#)
+			AND A.C046 = '1'
+			AND A.C097 = '1'
+	</select>
+
+	<!-- 운송코드 조회 쿼리 -->
+	<select id="transCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT RTRIM(C001) AS TRANS_CD
+			,RTRIM(C028) AS TRANS_NM
+		FROM Hwinmm.dbo.MV1001
+		WHERE C001 = #transCd#
+	</select>
+
+	<!-- 운행일지 카운트 조회 쿼리 -->
+	<select id="drivingLogCnt" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT COUNT(*) AS ALL_CNT
+		FROM (
+			SELECT CONVERT(VARCHAR, A.IDX) AS IDX
+				,A.INPUT_DT AS INPUT_DT
+				,C.C030 AS CAR_CD
+				,A.EQUIP_CD AS EQUIP_CD
+				,C.C002 AS EQUIP_CD_NM
+				,A.EMP_CD AS EMP_CD
+				,A.WORK_SHIFT AS WORK_SHIFT
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), A.FUEL_QTY)) AS FUEL_QTY
+				,REPLACE(CONVERT(VARCHAR, CONVERT(MONEY, ISNULL(A.ELEMENT_QTY, 0)), 1), '.00', '') AS ELEMENT_QTY
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), A.HR_START_M)) AS HR_START_M
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), A.HR_END_M)) AS HR_END_M
+				,B.TRANS_CD AS TRANS_CD
+				,RTRIM(B.TRANS_NM) AS TRANS_NM
+				,RTRIM(B.TRANS_TM) AS TRANS_TM
+				,RTRIM(A.TRANSFER_MEMO) AS TRANSFER_MEMO
+				,A.INPUT_DT + ' / ' + (CASE WHEN A.WORK_SHIFT = '1' THEN '1근' WHEN A.WORK_SHIFT = '2' THEN '2근' WHEN A.WORK_SHIFT = '3' THEN '3근' END) AS DR_LOG_ITEM1
+				,RTRIM(B.TRANS_NM) + ' / ' + RTRIM(B.TRANS_TM) + ' / ' + CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), B.TRANS_QTY)) AS DR_LOG_ITEM2
+			FROM Hwinmm.dbo.EQUIP_DRIVE_RPTM A
+				LEFT OUTER JOIN Hwinmm.dbo.EQUIP_DRIVE_RPTD B ON A.IDX = B.IDX
+				LEFT OUTER JOIN Hwinmm.dbo.TM0265 C ON A.EQUIP_CD = C.C001
+			WHERE A.INPUT_DT BETWEEN #sdate# AND #edate#
+				AND C.C046 = '1'
+				AND C.C097 = '1'
+				AND (B.D_SEQ IS NULL OR B.D_SEQ IN (SELECT D_SEQ FROM (SELECT IDX, MIN(D_SEQ) AS D_SEQ FROM HWINMM.DBO.EQUIP_DRIVE_RPTD GROUP BY IDX) T WHERE IDX = B.IDX))
+				<!-- AND (B.D_SEQ IS NULL OR B.D_SEQ IN (SELECT D_SEQ FROM (SELECT IDX, D_SEQ, ROW_NUMBER() OVER (PARTITION BY IDX ORDER BY D_SEQ) AS RANKNO FROM HWINMM.DBO.EQUIP_DRIVE_RPTD ) T WHERE RANKNO = '1' AND IDX = B.IDX)) -->
+			<trim prefix ="and">
+			<if test = "carCombokey ! = 0">
+				C.C030 = #carCombokey#
+			</if>
+			<if test = "eqCombokey ! = 0">
+				C.C001 = #eqCombokey#
+			</if>
+			<if test = "authTp ! = 1">
+				A.CREATE_ID = #userId#
+			</if>
+		) T1
+		</trim>
+	</select>
+
+	<!-- 비가동 카운트 조회 쿼리 -->
+	<select id="drivingLogBreakCnt" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT COUNT(*) AS ALL_CNT
+		FROM (
+			SELECT ROW_NUMBER() OVER(ORDER BY A.CREATE_DT DESC) AS IDX
+			,RTRIM(A.BREAK_DT) AS BREAK_DT
+			,RTRIM(A.BREAK_START_TM) AS BREAK_START_TM
+			,CONVERT(VARCHAR(5), A.BREAK_END_TM, 8) AS BREAK_END_TM
+			,RTRIM(A.REMARKS) AS REMARKS
+			,RTRIM(B.EQUIP_CD) AS EQUIP_CD
+			,RTRIM(C.EQUIP_NM) AS EQUIP_NM
+			,RTRIM(C.CAR_CD) AS CAR_CD
+		FROM HWINMM.DBO.EQUIP_BREAK_INFO A
+			LEFT OUTER JOIN (SELECT T1.EQUIP_CD, T1.EMP_NO FROM (SELECT TOP 1 IDX, RTRIM(C001) AS EQUIP_CD, RTRIM(C003) AS EMP_NO FROM Hwinmm.dbo.TM0661 WHERE C003 = #userId# ORDER BY C007 DESC ) T1) B ON A.EMP_NO = B.EMP_NO
+			LEFT OUTER JOIN (SELECT RTRIM(C001) AS EQUIP_CD, RTRIM(C030) AS CAR_CD, RTRIM(C002) AS EQUIP_NM FROM Hwinmm.dbo.TM0265) C ON B.EQUIP_CD = C.EQUIP_CD
+		WHERE A.BREAK_DT BETWEEN #sdate# AND #edate#
+		<trim prefix="and">
+		<if test = "carCombokey ! = 0">
+			C.CAR_CD = #carCombokey#
+		</if>
+		<if test = "eqCombokey ! = 0">
+			B.EQUIP_CD = #eqCombokey#
+		</if>
+		<if test = "authTp ! = 1">
+			A.EMP_NO = #userId#
+		</if>
+		) T2
+		</trim>
+	</select>
+
+	<!-- 운행일지 NFC 태그 - ID 카운트 조회 쿼리 -->
+	<select id="chkTagDataCnt" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT COUNT(*) AS ALL_CNT
+		FROM Hwinmm.dbo.EQUIP_DRIVE_RPTM A
+		WHERE A.EQUIP_CD = #tag_no#
+			AND A.INPUT_DT = REPLACE(CONVERT(VARCHAR(10), GETDATE(),120), '-', '.')
+	</select>
+
+	<!-- 운행일지 조회 쿼리 -->
+	<select id="drivingLogList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		<![CDATA[
+		SELECT CONVERT(VARCHAR, A.IDX) AS IDX
+				,A.INPUT_DT AS INPUT_DT
+				,C.C030 AS CAR_CD
+				,A.EQUIP_CD AS EQUIP_CD
+				,C.C002 AS EQUIP_CD_NM
+				,A.EMP_CD AS EMP_CD
+				,A.WORK_SHIFT AS WORK_SHIFT
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), A.FUEL_QTY)) AS FUEL_QTY
+				,REPLACE(CONVERT(VARCHAR, CONVERT(MONEY, ISNULL(A.ELEMENT_QTY, 0)), 1), '.00', '') AS ELEMENT_QTY
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), A.HR_START_M)) AS HR_START_M
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), A.HR_END_M)) AS HR_END_M
+				,CASE WHEN ISNULL(A.HR_END_M, 0) > 0 THEN CONVERT(VARCHAR, (CONVERT(NUMERIC(10,1), ISNULL(A.HR_END_M, 0)) - CONVERT(NUMERIC(10,1), ISNULL(A.HR_START_M, 0)))) ELSE '0' END AS HR_CALC_M
+				,B.TRANS_CD AS TRANS_CD
+				,RTRIM(B.TRANS_NM) AS TRANS_NM
+				,RTRIM(B.TRANS_TM) AS TRANS_TM
+				,RTRIM(A.TRANSFER_MEMO) AS TRANSFER_MEMO
+				,A.INPUT_DT + ' / ' + (CASE WHEN A.WORK_SHIFT = '1' THEN '1근' WHEN A.WORK_SHIFT = '2' THEN '2근' WHEN A.WORK_SHIFT = '3' THEN '3근' END) AS DR_LOG_ITEM1
+				,RTRIM(B.TRANS_NM) + ' / ' + RTRIM(B.TRANS_TM) + ' / ' + CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), B.TRANS_QTY)) AS DR_LOG_ITEM2
+				,CASE WHEN A.INPUT_DT = #edate# THEN 'TO' ELSE 'YE' END DAY_FLAG
+		FROM Hwinmm.dbo.EQUIP_DRIVE_RPTM A
+			LEFT OUTER JOIN Hwinmm.dbo.EQUIP_DRIVE_RPTD B ON A.IDX = B.IDX
+			LEFT OUTER JOIN Hwinmm.dbo.TM0265 C ON A.EQUIP_CD = C.C001
+		WHERE A.INPUT_DT BETWEEN #sdate# AND #edate#
+			AND C.C046 = '1'
+			AND C.C097 = '1'
+			AND (B.D_SEQ IS NULL OR B.D_SEQ IN (SELECT D_SEQ FROM (SELECT IDX, MIN(D_SEQ) AS D_SEQ FROM HWINMM.DBO.EQUIP_DRIVE_RPTD GROUP BY IDX) T WHERE IDX = B.IDX))
+		]]>
+		<!-- AND (B.D_SEQ IS NULL OR B.D_SEQ IN (SELECT D_SEQ FROM (SELECT IDX, D_SEQ, ROW_NUMBER() OVER (PARTITION BY IDX ORDER BY D_SEQ) AS RANKNO FROM HWINMM.DBO.EQUIP_DRIVE_RPTD ) T WHERE RANKNO = '1' AND IDX = B.IDX)) -->
+		<trim prefix="and">
+		<if test = "carCombokey ! = 0">
+			C.C030 = #carCombokey#
+		</if>
+		<if test = "eqCombokey ! = 0">
+			C.C001 = #eqCombokey#
+		</if>
+		<if test = "authTp ! = 1">
+			A.CREATE_ID = #userId#
+		</if>
+		</trim>
+		<![CDATA[
+		ORDER BY CONVERT(NUMERIC, A.IDX) DESC
+		]]>
+	</select>
+
+	<!-- 비가동 조회 쿼리 -->
+	<select id="drivingLogBreakList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT CONVERT(VARCHAR, A.IDX) AS IDX
+				,RTRIM(A.BREAK_DT) AS BREAK_DT
+				,RTRIM(A.BREAK_START_TM) AS BREAK_START_TM
+				,CONVERT(VARCHAR(5), A.BREAK_END_TM, 8) AS BREAK_END_TM
+				,RTRIM(A.REMARKS) AS REMARKS
+				,RTRIM(B.EQUIP_CD) AS EQUIP_CD
+				,RTRIM(C.EQUIP_NM) AS EQUIP_NM
+				,RTRIM(C.CAR_CD) AS CAR_CD
+		FROM HWINMM.DBO.EQUIP_BREAK_INFO A
+			LEFT OUTER JOIN (SELECT T1.EQUIP_CD, T1.EMP_NO FROM (SELECT TOP 1 IDX, RTRIM(C001) AS EQUIP_CD, RTRIM(C003) AS EMP_NO FROM Hwinmm.dbo.TM0661 WHERE C003 = #userId# ORDER BY C007 DESC ) T1) B ON A.EMP_NO = B.EMP_NO
+			LEFT OUTER JOIN (SELECT RTRIM(C001) AS EQUIP_CD, RTRIM(C030) AS CAR_CD, RTRIM(C002) AS EQUIP_NM FROM Hwinmm.dbo.TM0265) C ON B.EQUIP_CD = C.EQUIP_CD
+		WHERE A.BREAK_DT BETWEEN #sdate# AND #edate#
+		<trim prefix="and">
+		<if test = "carCombokey ! = 0">
+			C.CAR_CD = #carCombokey#
+		</if>
+		<if test = "eqCombokey ! = 0">
+			B.EQUIP_CD = #eqCombokey#
+		</if>
+		<if test = "authTp ! = 1">
+			A.EMP_NO = #userId#
+		</if>
+		</trim>
+		ORDER BY A.IDX DESC
+	</select>
+
+	<!-- NFC TAG 조회 쿼리 -->
+	<select id="newTagDrivingLogInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT C001 AS EQUIP_CD
+				,C002 AS EQUIP_CD_NM
+				,C030 AS CAR_CD
+		FROM Hwinmm.dbo.TM0265
+		WHERE C001 = #tag_no#
+	</select>
+
+	<!-- NFC TAG 조회 쿼리 -->
+	<select id="oldTagDrivingLogInfo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		<![CDATA[
+		SELECT CONVERT(VARCHAR, A.IDX) AS IDX
+				,A.INPUT_DT AS INPUT_DT
+				,C.C030 AS CAR_CD
+				,A.EQUIP_CD AS EQUIP_CD
+				,C.C002 AS EQUIP_CD_NM
+				,A.EMP_CD AS EMP_CD
+				,A.WORK_SHIFT AS WORK_SHIFT
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), A.FUEL_QTY)) AS FUEL_QTY
+				,REPLACE(CONVERT(VARCHAR, CONVERT(MONEY, ISNULL(A.ELEMENT_QTY, 0)), 1), '.00', '') AS ELEMENT_QTY
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), A.HR_START_M)) AS HR_START_M
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10,1), A.HR_END_M)) AS HR_END_M
+				,CASE WHEN ISNULL(A.HR_END_M, 0) > 0 THEN CONVERT(VARCHAR, (CONVERT(NUMERIC(10,1), ISNULL(A.HR_END_M, 0)) - CONVERT(NUMERIC(10,1), ISNULL(A.HR_START_M, 0)))) ELSE '0' END AS HR_CALC_M
+				,A.TRANSFER_MEMO AS TRANSFER_MEMO
+		FROM Hwinmm.dbo.EQUIP_DRIVE_RPTM A
+			LEFT OUTER JOIN Hwinmm.dbo.TM0265 C ON A.EQUIP_CD = C.C001
+		WHERE A.EQUIP_CD = #tag_no#
+			AND A.INPUT_DT = REPLACE(CONVERT(VARCHAR(10), GETDATE(),120), '-', '.')
+			AND C.C046 = '1'
+			AND C.C097 = '1'
+		]]>
+	</select>
+
+	<!-- 운행일지 MASTER INSERT -->
+	<insert id="drivingLogMasterInsert" parameterType="java.util.HashMap">
+		INSERT INTO Hwinmm.dbo.EQUIP_DRIVE_RPTM (
+			IDX
+			,INPUT_DT
+			,EQUIP_CD
+			,EMP_CD
+			,WORK_SHIFT
+			,FUEL_QTY
+			,ELEMENT_QTY
+			,HR_START_M
+			,HR_END_M
+			,TRANSFER_MEMO
+			,CREATE_DT
+			,CREATE_ID
+			,CHANGE_DT
+			,CHANGE_ID
+		)
+		VALUES (
+			(SELECT ISNULL(MAX(IDX)+1, 1) FROM Hwinmm.dbo.EQUIP_DRIVE_RPTM)
+			,#input_dt#
+			,#equip_cd#
+			,#emp_cd#
+			,#work_shift#
+			,#fuel_qty#
+			,#element_qty#
+			,#hr_start_m#
+			,#hr_end_m#
+			,#transfer_memo#
+			,getdate()
+			,#create_id#
+			,getdate()
+			,#change_id#
+		)
+	</insert>
+
+	<!-- 운행일지 MASTER UPDATE -->
+	<update id="drivingLogMasterModify" parameterType="java.util.HashMap">
+		UPDATE Hwinmm.dbo.EQUIP_DRIVE_RPTM SET
+				INPUT_DT = #input_dt#
+				,WORK_SHIFT = #work_shift#
+				,FUEL_QTY = #fuel_qty#
+				,ELEMENT_QTY = #element_qty#
+				,HR_START_M = #hr_start_m#
+				,HR_END_M = #hr_end_m#
+				,TRANSFER_MEMO = #transfer_memo#
+				,CHANGE_DT = getdate()
+				,CHANGE_ID = #change_id#
+		WHERE IDX = #idx#
+	</update>
+
+	<!-- 운행일지 MASTER DELETE -->
+	<delete id="drivingLogMasterDelete" parameterType="java.util.HashMap">
+		BEGIN
+
+		DELETE FROM Hwinmm.dbo.EQUIP_DRIVE_RPTM
+		WHERE INPUT_DT = #date#
+			AND IDX = #key#;
+
+		DELETE FROM Hwinmm.dbo.EQUIP_DRIVE_RPTD
+		WHERE IDX = #key#;
+
+		END;
+	</delete>
+
+	<!-- 운행일지 DETAIL DELETE -->
+	<delete id="drivingLogDetailDelete" parameterType="java.util.HashMap">
+		DELETE FROM Hwinmm.dbo.EQUIP_DRIVE_RPTD
+		WHERE IDX = #key#
+			AND D_SEQ = #seq#
+	</delete>
+
+	<!-- 운행일지 DETAIL 카운트 조회 쿼리 -->
+	<select id="drivingLogWorkCnt" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT COUNT(*) AS REG_DETAIL_CNT
+		FROM Hwinmm.dbo.EQUIP_DRIVE_RPTD A, Hwinmm.dbo.EQUIP_DRIVE_RPTM B
+		WHERE A.IDX = B.IDX
+			AND A.IDX = #idx#
+	</select>
+
+	<!-- 운행일지 DETAIL 조회 쿼리 -->
+	<select id="drivingLogWorkList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT CONVERT(VARCHAR, A.IDX) AS IDX
+				,CONVERT(VARCHAR, A.D_SEQ) AS D_SEQ
+				,RTRIM(A.TRANS_CD) AS TRANS_CD
+				,RTRIM(A.TRANS_NM) AS TRANS_NM
+				,RTRIM(A.TRANS_TM) AS TRANS_TM
+				,CONVERT(VARCHAR, CONVERT(NUMERIC(10), A.TRANS_QTY)) AS TRANS_QTY
+				,RTRIM(A.TRANS_REMARKS) AS TRANS_REMARKS
+		FROM Hwinmm.dbo.EQUIP_DRIVE_RPTD A, Hwinmm.dbo.EQUIP_DRIVE_RPTM B
+		WHERE A.IDX = B.IDX
+			AND A.IDX = #idx#
+		ORDER BY CONVERT(NUMERIC, A.D_SEQ) DESC
+	</select>
+
+	<!-- 운행일지 DETAIL INSERT -->
+	<insert id="drivingLogDetailInsert" parameterType="java.util.HashMap">
+		INSERT INTO Hwinmm.dbo.EQUIP_DRIVE_RPTD (
+			IDX
+			,D_SEQ
+			,TRANS_CD
+			,TRANS_NM
+			,TRANS_TM
+			,TRANS_QTY
+			,TRANS_REMARKS
+			,CREATE_DT
+			,CREATE_ID
+			,CHANGE_DT
+			,CHANGE_ID
+		)
+		VALUES (
+			#idx#
+			,(SELECT ISNULL(MAX(D_SEQ)+1, 1) FROM Hwinmm.dbo.EQUIP_DRIVE_RPTD WHERE IDX = #idx#)
+			,#trans_cd#
+			,#trans_nm#
+			,#trans_tm#
+			,#trans_qty#
+			,#trans_remarks#
+			,getdate()
+			,#create_id#
+			,getdate()
+			,#change_id#
+		)
+	</insert>
+
+	<update id="drivingLogDetailUpdate" parameterType="java.util.HashMap">
+		UPDATE Hwinmm.dbo.EQUIP_DRIVE_RPTD SET
+				TRANS_CD = #trans_cd#
+				,TRANS_NM = #trans_nm#
+				,TRANS_TM = #trans_tm#
+				,TRANS_QTY = #trans_qty#
+				,TRANS_REMARKS = #trans_remarks#
+				,CHANGE_DT = GETDATE()
+				,CHANGE_ID = #change_id#
+		WHERE IDX = #idx#
+			AND D_SEQ = #dSeq#
+	</update>
+
+	<!-- 휴지정보 코드 가져오기 -->
+	<select id="breakCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select break_cd = value_code, break_nm = value_name
+		from SJ_SmartFDB.DBO.STD_CODE_REF_VALUE a
+			left outer join SJ_SmartFDB.DBO.STD_CODE_REF b on a.comp_id=b.comp_id and a.ref_code=b.ref_code
+		where a.comp_id='TW'
+			and b.ref_code = 'S_NOWORK_ITEM'
+		order by sortseq, value_code
+	</select>
+
+	<!-- 휴지정보 그놈만 찾기쿼리 -->
+	<select id="breakInfoItem" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			idx,
+			break_dt,
+			break_start_tm,
+			emp_no,
+			break_cd,
+			break_end_tm,
+			remarks
+		FROM HWINMM.DBO.EQUIP_BREAK_INFO
+		where break_dt=#sdate#
+			and break_start_tm=#start_tm#
+	</select>
+
+	<!-- 휴지정보 (TAB - idx) 그놈만 찾기쿼리 -->
+	<select id="breakTabInfoItem" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			CONVERT(VARCHAR, A.idx) AS idx,
+			A.break_dt AS break_dt,
+			RTRIM(A.break_start_tm) AS break_start_tm,
+			A.emp_no AS emp_no,
+			A.break_cd AS break_cd,
+			CONVERT(VARCHAR(5), A.break_end_tm, 8) AS break_end_tm,
+			A.remarks AS remarks,
+			A.emp_no + ' ' + (SELECT RTRIM(C002) FROM HPUBLIC00.DBO.T0201 WHERE C001 = A.emp_no) AS emp_info
+		FROM HWINMM.DBO.EQUIP_BREAK_INFO A
+		where A.idx = #idx#
+	</select>
+
+	<!-- 휴지정보 작성 -->
+	<insert id="drivingLogBreakWrite" parameterType="java.util.HashMap">
+		INSERT INTO HWINMM.DBO.EQUIP_BREAK_INFO (
+			idx
+			,break_dt
+			,break_start_tm
+			,emp_no
+			,break_cd
+			,break_end_tm
+			,remarks
+			,create_dt
+			,create_id
+			,change_dt
+			,change_id
+		)
+		VALUES (
+			(SELECT ISNULL(MAX(IDX), 0)+1 FROM HWINMM.DBO.EQUIP_BREAK_INFO)
+			,#dis_dt#
+			,convert(char(5),convert(datetime, #start_td#),8)
+			,#login_id#
+			,#break_cd#
+			,convert(char(5),convert(datetime, #end_td#),8)
+			,#txt_etc#
+			,getdate()
+			,#login_id#
+			,getdate()
+			,#login_id#
+		)
+	</insert>
+
+	<!-- 휴지정보 수정 -->
+	<update id="drivingLogBreakModify" parameterType="java.util.HashMap">
+		UPDATE HWINMM.DBO.EQUIP_BREAK_INFO SET
+				break_cd=#break_cd#,
+				break_start_tm=convert(char(5),convert(datetime, #start_td#),8),
+				break_end_tm=convert(char(5),convert(datetime, #end_td#),8),
+				remarks=#txt_etc#
+		WHERE IDX = #idx#
+	</update>
+
+	<!-- 휴지정보 삭제 -->
+	<delete id="drivingLogBreakDelete" parameterType="java.util.HashMap">
+		DELETE FROM HWINMM.DBO.EQUIP_BREAK_INFO
+		WHERE idx = #idx#
+	</delete>
+</mapper>

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="board">
+
+	<!-- 공장별/직책별 코드 리스트 -->
+	<select id="noticeBoardCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		<if test="push_target == 'F'">
+<!-- 			SELECT
+				FAC_CD AS code
+				,FAC_NM AS name
+			FROM BASE_FACTORY_LIST() -->
+			SELECT 
+				C001 AS code,
+				C002 AS name
+			  FROM HPUBLIC00.DBO.T0102		
+		</if>
+		<if test="push_target == 'J'">
+<!-- 			SELECT
+				DUTY_CD AS code
+				,DUTY_NM AS name			
+			FROM INSA_DUTY_LIST() -->
+			SELECT 
+				C001 AS code,
+				C002 AS name
+			  FROM Hpublic00.dbo.T0103 			
+		</if>				
+	</select>
+	
+	<select id="noticeBoardList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			push_key
+			,convert(varchar, push_date, 23) AS push_date
+			,push_target
+			,detail_target
+			,target_nm
+			,push_title
+			,push_text
+			,input_id
+			,input_nm
+		from PBOARD_LIST()
+		<trim prefix="where">
+			<if test = "push_key ! = null">
+				push_key=#push_key#
+			</if>		
+		</trim>
+		ORDER BY push_date DESC
+	</select>
+	
+	<insert id="noticeBoardInsert" parameterType="java.util.HashMap">
+		<selectKey keyProperty="push_key" resultType="int">
+			select
+			ISNULL(max(push_key)+1,1) as push_key
+			FROM board_push_info
+		</selectKey>  
+		
+		INSERT INTO board_push_info
+			(push_key
+			,push_date
+			,push_target
+			,detail_target
+			,push_title
+			,push_text
+			,input_id
+			,input_date
+			,hit_count)
+		VALUES(
+			#push_key#
+			,#push_date#
+			,#push_target#
+			,#detail_target#
+			,#push_title#
+			,#push_text#
+			,#writer_sabun#
+			,getdate()
+			,#hit_count#)
+	</insert>
+	
+	<update id="noticeBoardUpdate" parameterType="java.util.HashMap">
+		UPDATE board_push_info SET
+			push_date=#push_date#
+			,push_target=#push_target#
+			,detail_target=#detail_target#
+			,push_title=#push_title#
+			,push_text=#push_text#
+			,input_id=#writer_sabun#
+			,input_date=getdate()
+		WHERE push_key=#push_key#
+	</update>	
+	
+	<delete id="noticeBoardDelete" parameterType="java.util.HashMap">
+		DELETE FROM board_push_info
+		WHERE push_key=#push_key#
+	</delete>
+	
+	
+	<!-- //////////////////////// 푸시 토큰 데이터 관련 ////////////////////// -->
+	
+	<!-- 토큰 중복 확인 -->
+	<select id="tokenDataCheck" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+			SELECT
+				count(*) AS CNT
+			FROM PUSH_DATA
+			WHERE TOKEN=#token#			
+	</select>
+	
+	<!-- 안드로이드 아이디 중복 확인 -->
+	<select id="AndIDCheck" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+			SELECT
+				count(*) AS CNT
+			FROM PUSH_DATA
+			WHERE AND_ID=#and_id#
+	</select>	
+	
+	<delete id="tokenDataDelete" parameterType="java.util.HashMap">
+		DELETE FROM PUSH_DATA
+		WHERE AND_ID=#and_id#
+	</delete>
+	
+	<!-- 토큰정보 갱신 -->
+	<update id="tokenDataUpdate" parameterType="java.util.HashMap">
+		UPDATE PUSH_DATA SET
+			TOKEN=#token#
+			,PHONE_NUM=#phone_num#
+			,SABUN_NO=#sabun_no#
+			,TOKEN_DATE=getdate()
+		WHERE AND_ID=#and_id#
+	</update>
+	
+	<!-- 토큰 데이터 저장 -->
+	<insert id="tokenDataInsert" parameterType="java.util.HashMap">
+		<selectKey keyProperty="idx" resultType="int">
+			select
+			ISNULL(max(idx)+1,1) as idx
+			FROM PUSH_DATA
+		</selectKey>  
+		
+		INSERT INTO PUSH_DATA
+			(idx
+			,token
+			,push_group
+			,phone_num
+			,sabun_no
+			,token_date
+			,and_id)
+		VALUES(
+			#idx#
+			,#token#
+			,#push_group#
+			,#phone_num#
+			,#sabun_no#
+			,getdate()
+			,#and_id#)
+	</insert>
+	
+	<!-- 직위별/공장별 푸쉬 전송 목록 -->
+	<select id="pushDataList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			idx
+			,token
+			,push_group
+			,phone_num
+			,sabun_no
+			,token_date
+			,and_id
+			,C.C001 AS f_pos
+			,B.C005 AS j_pos
+		FROM PUSH_DATA A
+		LEFT OUTER JOIN HPUBLIC00.DBO.T0201 B ON A.sabun_no = B.C001
+		LEFT OUTER JOIN HPUBLIC00.DBO.T0102 C ON B.C004=C.C001
+		<trim prefix="where">
+			<!-- <isNotEmpty property="sabun_no">
+				sabun_no=#sabun_no#
+			</isNotEmpty> -->
+			<if test="push_target == 'F'">
+				C.C001=#detail_target#
+			</if>
+			<if test="push_target == 'J'">
+				B.C005=#detail_target#
+			</if>			
+		</trim>		
+	</select>
+
+	<!-- 자율상호주의 푸쉬 전송 목록 -->
+	<select id="peerPushDataList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			idx
+			,token
+			,push_group
+			,phone_num
+			,sabun_no
+			,token_date
+			,and_id
+			,C.C001 AS f_pos
+			,B.C005 AS j_pos
+		FROM PUSH_DATA A
+		LEFT OUTER JOIN HPUBLIC00.DBO.T0201 B ON A.sabun_no = B.C001
+		LEFT OUTER JOIN HPUBLIC00.DBO.T0102 C ON B.C004=C.C001
+		<trim prefix="where">
+			<if test = "sabun_no ! = null">
+				sabun_no=#sabun_no#
+			</if>
+		</trim>		
+	</select>
+</mapper>

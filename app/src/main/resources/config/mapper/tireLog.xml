@@ -1,0 +1,371 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="tireLog">
+	<!-- 장비 조회 쿼리 -->
+	<select id="allTireEquipCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT C001 AS EQUIP_CD
+				,C002 AS EQUIP_NM
+				,C003 AS IDX
+		FROM Hwinmm.dbo.MV1010
+		ORDER BY IDX
+	</select>
+	
+	<!-- 장비번호 조회 쿼리 -->
+	<select id="tireEquipCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT A.C001 AS EQUIP_CD
+				<!-- ,RIGHT(RTRIM(A.C072), 4) + ' (' + LTRIM(A.C002) + ')' as EQUIP_NM -->
+				,RIGHT(RTRIM(A.C072), 4) + CASE WHEN LTRIM(A.C030) = (SELECT LTRIM(T1.C001) FROM HWINMM.DBO.MV1010 T1 WHERE T1.C005 != '99' AND A.C030 = T1.C001) THEN ' (' + LEFT(LTRIM(A.C002), 3) + ')' ELSE ' (' + LTRIM(A.C002) + ')' END as EQUIP_NM
+				,A.C072 AS CAR_NUMBER
+				,A.C004 AS MAKE_COMP
+				,(SELECT aaa=SJ_SmartFDB.dbo.fn_TW_EQM_GetInsaNm(A.C001)) AS DRIVER_NM
+				,(SELECT bbb=SJ_SmartFDB.dbo.fn_TW_EQM_GetInsaNo(A.C001)) AS DRIVER_NO
+				,ROW_NUMBER() OVER(ORDER BY A.C001) AS IDX
+		FROM Hwinmm.dbo.TM0265 A
+		WHERE A.C030 = rtrim(#equipCd#)
+		AND A.C046 = '1'
+		AND A.C097 = '1'
+	</select>
+	
+	<!-- 운송코드 조회 쿼리 -->
+	<select id="tireTransCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT RTRIM(C001) AS TRANS_CD
+				,RTRIM(C028) AS TRANS_NM
+		FROM Hwinmm.dbo.MV1001
+		WHERE C001 = #transCd#
+	</select>
+	
+	<!-- 장비번호 조회 쿼리 -->
+	<!-- 발생장소 삭제
+	<select id="tireEvPlaceList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY A.VALUE_CODE)) AS IDX
+				,RTRIM(A.VALUE_CODE) AS VALUE_CODE
+				,RTRIM(A.VALUE_NAME) AS VALUE_NAME
+		FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE A, SJ_SmartFDB.DBO.STD_CODE_REF B
+		WHERE A.COMP_ID = B.COMP_ID
+			AND A.REF_CODE = B.REF_CODE
+			AND A.COMP_ID = 'TW'
+			AND A.REF_CODE = 'OCCUR_PLACE'
+	</select>
+	-->
+	
+	<!-- 타이어일지 카운트 조회 쿼리 -->
+	<select id="tireLogCnt" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT COUNT(*) AS ALL_CNT
+		FROM (
+			SELECT CONVERT(VARCHAR, A.IDX) AS IDX
+					,RTRIM(A.INPUT_DT) AS INPUT_DT
+					,RTRIM(A.INPUT_TM) AS INPUT_TM
+					,RTRIM(A.END_TM) AS END_TM
+					,RTRIM(A.EQUIP_CD) AS EQUIP_CD
+					,RTRIM(B.TIRE_CD) AS TIRE_CD
+					,RTRIM(A.EMP_CD) AS EMP_CD
+					,RTRIM(A.PLACE_CD) AS PLACE_CD
+					,CASE WHEN RTRIM(A.PLACE_CD) = '100' THEN (SELECT RTRIM(VALUE_NAME) FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'OCCUR_PLACE' AND VALUE_CODE = A.PLACE_CD)
+						WHEN RTRIM(A.PLACE_CD) = '110' THEN (SELECT RTRIM(VALUE_NAME) FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'OCCUR_PLACE' AND VALUE_CODE = A.PLACE_CD)
+					END AS PLACE_NM
+					,C.C011
+					+ ' / ' + (SELECT RTRIM(VALUE_NAME) FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'TIRE_AXIS' AND VALUE_CODE = RTRIM(B.TIRE_LOCATION1))
+					+ ' / ' + (SELECT VALUE_NAME FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'TIRE_STATUS' AND VALUE_CODE = B.TIRE_STATUS) AS TIRE_ITEM
+					,RTRIM(A.OCCUR_ORIGN) AS OCCUR_ORIGN
+					,RTRIM(D.C002) AS EQUIP_CD_NM
+					<!-- ,RTRIM(CONVERT(NUMERIC(10, 1), ISNULL(E.HR_END_M, 0) - ISNULL(A.HR_M, 0))) AS HR_M -->
+					,RTRIM(CONVERT(NUMERIC(10, 1), ISNULL(A.HR_M, 0))) AS HR_M
+					,RTRIM(D.C030) AS CAR_KIND_CD
+					,RTRIM(D.C072) AS CAR_NUMBER
+			FROM Hwinmm.dbo.TIRE_RPTM A
+				LEFT OUTER JOIN Hwinmm.dbo.TIRE_RPTD B ON A.IDX = B.IDX
+				LEFT OUTER JOIN Hwinmm.dbo.TM0101 C ON B.TIRE_CD = C.C001 AND C.C019 = 'TY'
+				LEFT OUTER JOIN Hwinmm.dbo.TM0265 D ON A.EQUIP_CD = D.C001
+			WHERE A.INPUT_DT BETWEEN #sdate# AND #edate#
+				AND (B.D_SEQ IS NULL OR B.D_SEQ IN (SELECT D_SEQ FROM (SELECT IDX, D_SEQ, ROW_NUMBER() OVER (PARTITION BY IDX ORDER BY D_SEQ) AS RANKNO FROM HWINMM.DBO.TIRE_RPTD ) T WHERE RANKNO = '1' AND IDX = B.IDX))
+				<trim prefix = "and">
+				<if test = 'carCombokey != "0"'>
+					D.C030 = #carCombokey#
+				</if>
+				<if test = 'eqCombokey != "0"'>
+					D.C001 = #eqCombokey#
+				</if>
+				</trim>
+		) T1
+	</select>
+	
+	<!-- 타이어일지 조회 쿼리 -->
+	<select id="tireLogList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT CONVERT(VARCHAR, A.IDX) AS IDX
+				,RTRIM(A.INPUT_DT) AS INPUT_DT
+				,RTRIM(A.INPUT_TM) AS INPUT_TM
+				,RTRIM(A.END_TM) AS END_TM
+				,RTRIM(A.EQUIP_CD) AS EQUIP_CD
+				,RTRIM(B.TIRE_CD) AS TIRE_CD
+				,RTRIM(A.EMP_CD) AS EMP_CD
+				,RTRIM(A.PLACE_CD) AS PLACE_CD
+				,CASE WHEN RTRIM(A.PLACE_CD) = '100' THEN (SELECT RTRIM(VALUE_NAME) FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'OCCUR_PLACE' AND VALUE_CODE = A.PLACE_CD)
+					WHEN RTRIM(A.PLACE_CD) = '110' THEN (SELECT RTRIM(VALUE_NAME) FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'OCCUR_PLACE' AND VALUE_CODE = A.PLACE_CD)
+				END AS PLACE_NM
+				,C.C011
+				+ ' / ' + (SELECT RTRIM(VALUE_NAME) FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'TIRE_AXIS' AND VALUE_CODE = RTRIM(B.TIRE_LOCATION1))
+				+ ' / ' + (SELECT VALUE_NAME FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'TIRE_STATUS' AND VALUE_CODE = B.TIRE_STATUS) AS TIRE_ITEM
+				,RTRIM(A.OCCUR_ORIGN) AS OCCUR_ORIGN
+				,RTRIM(D.C002) AS EQUIP_CD_NM
+				<!-- ,RTRIM(CONVERT(NUMERIC(10, 1), ISNULL(E.HR_END_M, 0) - ISNULL(A.HR_M, 0))) AS HR_M -->
+				,RTRIM(CONVERT(NUMERIC(10, 1), ISNULL(A.HR_M, 0))) AS HR_M
+				,RTRIM(D.C030) AS CAR_KIND_CD
+				,RTRIM(D.C072) AS CAR_NUMBER
+		FROM Hwinmm.dbo.TIRE_RPTM A
+			LEFT OUTER JOIN Hwinmm.dbo.TIRE_RPTD B ON A.IDX = B.IDX
+			LEFT OUTER JOIN Hwinmm.dbo.TM0101 C ON B.TIRE_CD = C.C001 AND C.C019 = 'TY'
+			LEFT OUTER JOIN Hwinmm.dbo.TM0265 D ON A.EQUIP_CD = D.C001
+		WHERE A.INPUT_DT BETWEEN #sdate# AND #edate#
+			AND (B.D_SEQ IS NULL OR B.D_SEQ IN (SELECT D_SEQ FROM (SELECT IDX, D_SEQ, ROW_NUMBER() OVER (PARTITION BY IDX ORDER BY D_SEQ) AS RANKNO FROM HWINMM.DBO.TIRE_RPTD ) T WHERE RANKNO = '1' AND IDX = B.IDX))
+			<trim prefix = "and">
+			<if test = 'carCombokey != "carCombokey"'>
+				D.C030 = #carCombokey#
+			</if>
+			<if test = 'eqCombokey != "carCombokey"'>
+				D.C001 = #eqCombokey#
+			</if>
+			</trim>
+		ORDER BY CONVERT(NUMERIC, A.IDX) DESC
+	</select>
+	
+	<!-- 타이어일지 MASTER INSERT -->
+	<insert id="tireLogMasterInsert" parameterType="java.util.HashMap">
+		INSERT INTO Hwinmm.dbo.TIRE_RPTM(
+			IDX
+			,INPUT_DT
+			,EQUIP_CD
+			,EMP_CD
+			,INPUT_TM
+			,END_TM
+			,PLACE_CD
+			,OCCUR_ORIGN
+			,CREATE_DT
+			,CREATE_ID
+			,CHANGE_DT
+			,CHANGE_ID
+			,HR_M
+		)VALUES(
+			(SELECT ISNULL(MAX(IDX)+1, 1) FROM Hwinmm.dbo.TIRE_RPTM)
+			,#input_dt#
+			,#equip_cd#
+			,#emp_cd#
+			,#input_tm#
+			,#end_tm#
+			,NULL
+			,#occur_orign#
+			,getdate()
+			,#create_id#
+			,getdate()
+			,#change_id#
+			,#hr_m#
+		)
+	</insert>
+	
+	<!-- 타이어일지 MASTER UPDATE -->
+	<update id="tireLogMasterModify" parameterType="java.util.HashMap">
+		UPDATE Hwinmm.dbo.TIRE_RPTM SET
+			INPUT_DT = #input_dt#
+			,INPUT_TM = #input_tm#
+			,END_TM = #end_tm#
+			,OCCUR_ORIGN = #occur_orign#
+			,HR_M = #hr_m#
+			,CHANGE_DT = getdate()
+			,CHANGE_ID = #change_id#
+		WHERE IDX = #idx#
+	</update>
+	
+	<!-- 운행일지 MASTER DELETE -->
+	<delete id="tireLogMasterDelete" parameterType="java.util.HashMap">
+		BEGIN
+		
+		DELETE FROM Hwinmm.dbo.TIRE_RPTM
+		WHERE INPUT_DT = #date#
+			AND IDX = #key#;
+			
+		DELETE FROM Hwinmm.dbo.TIRE_RPTD
+		WHERE IDX = #key#;
+			
+		END;
+	</delete>
+	
+	<!-- 운행일지 DETAIL DELETE -->
+	<delete id="tireLogDetailDelete" parameterType="java.util.HashMap">
+		DELETE FROM Hwinmm.dbo.TIRE_RPTD
+		WHERE IDX = #key#
+			AND D_SEQ = #seq#
+	</delete>
+	
+	<!-- 운행일지 DETAIL 조회 쿼리 -->
+	<select id="tireLogWorkList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT CONVERT(VARCHAR, A.IDX) AS IDX
+				,CONVERT(VARCHAR, A.D_SEQ) AS D_SEQ
+				,RTRIM(A.TIRE_CD) AS TIRE_CD
+				,RTRIM(A.TIRE_NM) AS TIRE_NM
+				,RTRIM(A.TIRE_NUM) AS TIRE_NUM
+				,RTRIM(A.TIRE_LOCATION1) AS TIRE_LOCATION1
+				,RTRIM(A.TIRE_STATUS) AS TIRE_STATUS
+				,RTRIM(A.TIRE_METHOD) AS TIRE_METHOD
+				,(SELECT VALUE_NAME FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'TIRE_AXIS' AND VALUE_CODE = A.TIRE_LOCATION1) AS TIRE_LOCATION
+				,RTRIM(A.TIRE_LOCATION1) AS TIRE_LOCATION_CODE
+				,(SELECT VALUE_NAME FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'TIRE_STATUS' AND VALUE_CODE = A.TIRE_STATUS) AS TIRE_STATUS2 
+				,RTRIM(B.HR_M) AS HR_M
+				,RTRIM(B.INPUT_DT) AS INPUT_DT
+				,RTRIM(C.C030) AS CAR_KIND_CD
+		FROM Hwinmm.dbo.TIRE_RPTD A, Hwinmm.dbo.TIRE_RPTM B
+			LEFT OUTER JOIN Hwinmm.dbo.TM0265 C ON C.C001 = B.EQUIP_CD
+		WHERE A.IDX = B.IDX
+			AND A.IDX = #idx#
+		ORDER BY CONVERT(NUMERIC, A.D_SEQ) DESC
+	</select>
+	
+	<!-- 타이어일지 이력 조회 쿼리 -->
+	<select id="groupCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		WITH BASE AS (
+			SELECT CONVERT(VARCHAR, A.IDX) AS IDX
+					,CONVERT(VARCHAR, A.D_SEQ) AS D_SEQ
+					,RTRIM(B.INPUT_DT) AS INPUT_DT
+					,RTRIM(A.TIRE_LOCATION1) AS TIRE_LOCATION1
+					,RTRIM(A.TIRE_NUM) AS TIRE_NUM
+					,RTRIM(B.EQUIP_CD) AS EQUIP_CD
+					,(SELECT VALUE_NAME FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'TIRE_AXIS' AND VALUE_CODE = A.TIRE_LOCATION1) AS TIRE_LOCATION1_NM
+					,RTRIM(A.TIRE_STATUS) AS TIRE_STATUS
+					,(SELECT VALUE_NAME FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE WHERE COMP_ID = 'TW' AND REF_CODE = 'TIRE_STATUS' AND VALUE_CODE = A.TIRE_STATUS) AS TIRE_STATUS2
+					,RTRIM(ISNULL(B.HR_M, 0)) AS HR_M
+			FROM Hwinmm.dbo.TIRE_RPTD A, Hwinmm.dbo.TIRE_RPTM B
+			WHERE A.IDX = B.IDX
+		)
+		SELECT IDX
+				,D_SEQ
+				,INPUT_DT
+				,TIRE_NUM
+				,EQUIP_CD
+				,TIRE_LOCATION1
+				,TIRE_LOCATION1_NM AS TIRE_LOCATION
+				,TIRE_STATUS
+				,TIRE_STATUS2
+				,HR_M
+		FROM BASE
+		WHERE EQUIP_CD = #equipCd#
+		ORDER BY TIRE_LOCATION1, IDX
+	</select>
+	
+	<!-- 운행일지 DETAIL INSERT -->
+	<insert id="tireLogDetailInsert" parameterType="java.util.HashMap">
+		INSERT INTO Hwinmm.dbo.TIRE_RPTD(
+			IDX
+			,D_SEQ
+			,TIRE_CD
+			,TIRE_NM
+			,TIRE_NUM
+			,TIRE_LOCATION1
+			,TIRE_LOCATION2
+			,TIRE_STATUS
+			,TIRE_METHOD
+			,CREATE_DT
+			,CREATE_ID
+			,CHANGE_DT
+			,CHANGE_ID
+		)VALUES(
+			#idx#
+			,(SELECT ISNULL(MAX(D_SEQ)+1, 1) FROM Hwinmm.dbo.TIRE_RPTD WHERE IDX = #idx#)
+			,#tire_cd#
+			,#tire_nm#
+			,#tire_num#
+			,#tire_axis#
+			,NULL
+			,#tire_status#
+			,#tire_method#
+			,getdate()
+			,#create_id#
+			,getdate()
+			,#change_id#
+		)
+	</insert>
+	
+	<!-- 운행일지 DETAIL UPDATE -->
+	<update id="tireLogDetailUpdate" parameterType="java.util.HashMap">
+		UPDATE Hwinmm.dbo.TIRE_RPTD SET
+			TIRE_CD = #tire_cd#
+			,TIRE_NM = #tire_nm#
+			,TIRE_NUM = #tire_num#
+			,TIRE_LOCATION1 = #tire_axis#
+			,TIRE_STATUS = #tire_status#
+			,TIRE_METHOD = #tire_method#
+			,CHANGE_DT = GETDATE()
+			,CHANGE_ID = #change_id#
+		WHERE IDX = #idx#
+			AND D_SEQ = #dSeq#
+	</update>
+	
+	<!-- 타이어 코드&규격 조회 쿼리 -->
+	<select id="tireCodeList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY SORTSEQ)) AS IDX
+			,RTRIM(VALUE_CODE) AS VALUE_CODE
+			,RTRIM(VALUE_NAME) AS VALUE_NAME
+		FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE
+		WHERE REF_CODE = 'TIRE_TYPE'
+		<!--
+		SELECT CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY C001)) AS IDX
+				,RTRIM(C001) AS VALUE_CODE
+				,RTRIM(C011) AS VALUE_NAME
+		FROM Hwinmm.dbo.TM0101
+		WHERE C019 = 'TY'
+			AND C009 = '1'
+		-->
+	</select>
+	
+	<!-- 타이어 축&위치&상태 조회 쿼리 -->
+	<select id="tireInfoList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY B.SORTSEQ)) AS IDX
+				,RTRIM(B.VALUE_CODE) AS VALUE_CODE
+				,RTRIM(B.VALUE_NAME) AS VALUE_NAME
+		FROM SJ_SmartFDB.DBO.STD_CODE_REF A, SJ_SmartFDB.DBO.STD_CODE_REF_VALUE B
+		WHERE A.COMP_ID = B.COMP_ID
+			AND A.REF_CODE = B.REF_CODE
+			AND A.COMP_ID = 'TW'
+			AND B.USE_YN = 'Y'
+			AND A.REF_CODE = #code#
+	</select>
+	
+	<!-- 타이어 축&위치 통합 조회 쿼리 -->
+	<select id="tireInfoList2" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		WITH BASE AS (
+			SELECT RTRIM(B.VALUE_CODE) AS VALUE_CODE
+					,RTRIM(B.VALUE_NAME) AS VALUE_NAME
+					,SORTSEQ AS SORTSEQ
+			FROM SJ_SmartFDB.DBO.STD_CODE_REF_VALUE B
+			WHERE B.COMP_ID = 'TW'
+				AND B.USE_YN = 'Y'
+				AND B.REF_CODE = 'TIRE_AXIS'
+				<if test="gubun == 'S'">
+					AND B.VALUE_CODE IN ('01L', '01R', '02L', '02R')
+				</if>
+				<if test="gubun == 'DT3'">
+					AND B.VALUE_CODE IN ('011', '012', '021', '022', '023', '024', '031', '032', '033', '034')
+				</if>
+				<if test="gubun == 'DT6'">
+					AND B.VALUE_CODE IN ('011', '012', '021', '022', '031', '032')
+				</if>
+				<if test="gubun == 'DT7'">
+					AND B.VALUE_CODE IN ('011', '012', '021', '022', '023', '024', '031', '032', '033', '034', '041', '042', '043', '044')
+				</if>
+				<if test="gubun == 'VD'">
+					AND B.VALUE_CODE IN ('011', '012', '021', '022', '031', '032', '033', '034', '041', '042', '043', '044')
+				</if>
+				<if test="gubun == 'CD'">
+					AND B.VALUE_CODE IN ('T11', 'T12', 'T13', 'T14', 'T21', 'T22', 'T23', 'T24', 'T31', 'T32', 'T33', 'T34', 'T41', 'T42', 'T43', 'T44')
+				</if>
+				<if test="gubun == 'SP'">
+					AND (B.VALUE_CODE BETWEEN 'T11' AND 'T38' AND B.VALUE_CODE NOT IN ('T13', 'T14'))
+				</if>
+		)
+		SELECT CONVERT(VARCHAR, ROW_NUMBER() OVER(ORDER BY SORTSEQ)) AS IDX
+				,VALUE_CODE
+				,VALUE_NAME
+		FROM BASE
+		ORDER BY SORTSEQ
+	</select>
+</mapper>

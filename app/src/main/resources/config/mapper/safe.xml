@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="safe">
+	
+	<!-- /////////////////////////////////안전관리///////////////////////////////// -->
+	
+	<select id="safe_lCategoryList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+	 	select * FROM 
+		hwinmm.dbo.l_category
+	</select>	
+	
+	<select id="safe_mCategoryList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select * FROM 
+		hwinmm.dbo.m_category
+		WHERE LARGE_CD=#large_cd#
+	</select>		
+	
+	<select id="safe_mCategoryMap" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select * FROM 
+		hwinmm.dbo.m_category
+		WHERE LARGE_CD=#large_cd#
+		<trim prefix = "and">
+			<if test = "mid_cd ! = null">
+				MID_CD=#mid_cd#
+			</if>
+		</trim>
+	</select>		
+	
+	<!--해당 안전관리 항목 리스트 -->
+	<select id="safe_chk_itemList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select * FROM 
+		hwinmm.dbo.chk_item
+		WHERE LARGE_CD=#large_cd# AND MID_CD=#mid_cd#
+		<trim prefix = "and">
+			<if test = "chk_cd ! = null">
+				CHK_CD=#chk_cd#
+			</if>
+		</trim>		
+	</select>
+	
+	<!--해당 안전관리 마스터 저장 -->
+	<insert id="safe_chk_result_mInsert" parameterType="java.util.HashMap">
+<!-- 		<selectKey keyProperty="idx" resultType="int">
+			select
+			ISNULL(max(IDX)+1,1) as IDX
+			FROM hwinmm.dbo.chk_result_m
+		</selectKey> -->
+		INSERT INTO hwinmm.dbo.chk_result_m
+			(
+			input_date
+			,input_id
+			,large_cd
+			,mid_cd
+			,doc_seq
+			,save_person
+			,auto_date
+			,etc)
+		VALUES(
+			#input_date#
+			,#sabun_no#
+			,#large_cd#
+			,#mid_cd#
+			,#doc_seq#
+			,#save_person#
+			,getdate()
+			,#etc#)
+	</insert>
+	
+	<!--해당 안전관리 마스터 IDX-->
+	<select id="get_safe_chk_idx" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select ident_current('hwinmm.dbo.chk_result_m') IDX
+	</select>	
+	
+	<!--해당 안전관리 마스터 리스트 -->
+	<select id="safe_chk_result_mList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			idx
+			,input_date
+			,replace(input_date,'.','-') modify_date
+			,input_id
+			,large_cd
+			,mid_cd
+			,doc_seq
+			,B.C005 j_pos
+			,B.C002 as save_person
+			,auto_date
+			,etc		
+		FROM 
+		hwinmm.dbo.chk_result_m A
+		LEFT OUTER JOIN HPUBLIC00.DBO.T0201 B ON A.input_id = B.C001
+		<trim prefix="where">
+			<if test = 'large_cd != 0'>
+				LARGE_CD=#large_cd#
+			</if>
+			<if test = 'mid_cd != 0'>
+				MID_CD=#mid_cd#
+			</if>
+			<if test = 'idx != null '>
+				IDX=#idx#
+			</if>		
+			<if test = 'state != null'>
+				input_date between #sdate# and #edate#
+			</if>
+		</trim>
+		order by auto_date DESC
+	</select>
+	
+	<!--해당 안전관리 디테일 저장 -->
+	<insert id="safe_chk_result_dInsert" parameterType="java.util.HashMap">
+		INSERT INTO hwinmm.dbo.chk_result_d
+			(idx
+			,chk_cd
+			,chk_rst_cd
+			,chk_measure
+			,max_date
+			,improve_user
+			,etc)
+		VALUES(
+			#idx#
+			,#chk_cd#
+			,#chk_rst_cd#
+			,#chk_measure#
+			,#max_date#
+			,#improve_user#
+			,#mea_etc#)
+	</insert>	
+	
+	<!--해당 안전관리 디테일 리스트 -->
+	<select id="safe_chk_result_dList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			A.idx
+			,A.chk_cd
+			,A.chk_rst_cd
+			,CASE WHEN A.chk_rst_cd=1 THEN '예' WHEN A.chk_rst_cd=2 THEN '아니오' 
+				WHEN A.chk_rst_cd=3 THEN '해당없음'  ELSE '대책' END AS chk_rst_yn
+			,A.chk_measure
+			,A.max_date
+			,A.improve_user
+			,A.etc
+			,B.chk_nm
+		from hwinmm.dbo.chk_result_d A
+		LEFT OUTER JOIN hwinmm.dbo.chk_item B ON A.chk_cd=B.chk_cd
+		RIGHT OUTER JOIN hwinmm.dbo.chk_result_m C ON C.large_cd=B.large_cd and C.mid_cd=B.mid_cd and A.idx=C.idx
+		
+		<trim prefix="where">
+			<if test ="large_cd != 0">
+				C.LARGE_CD=#large_cd#
+			</if>
+			<if test ="mid_cd != 0">
+				C.MID_CD=#mid_cd#
+			</if>
+			<if test ="idx != 0">
+				A.IDX=#idx#
+			</if>
+		</trim>		
+	</select>
+	
+	<!-- 안전관리 마스터 수정 -->
+	<update id="safe_chk_result_mUpdate" parameterType="java.util.HashMap">
+		UPDATE 
+		hwinmm.dbo.chk_result_m SET
+			input_date=#input_date#
+			,auto_date=getdate()
+			,etc=#etc#
+		WHERE IDX=#idx#
+	</update>
+	
+	<!-- 안전관리 마스터 수정 -->
+	<update id="safe_chk_result_dUpdate" parameterType="java.util.HashMap">
+		UPDATE 
+		hwinmm.dbo.chk_result_d SET
+			chk_rst_cd=#chk_rst_cd#
+			,chk_measure=#chk_measure#
+			,max_date=#max_date#
+			,improve_user=#improve_user#
+			,etc=#mea_etc#
+		WHERE IDX=#idx# AND CHK_CD=#chk_cd#
+	</update>	
+
+	<!-- 해당 안전관리 마스터 리스트 삭제 -->
+	<delete id="safe_chk_result_mDelete">
+		DELETE FROM 
+			hwinmm.dbo.chk_result_m
+		WHERE LARGE_CD=#large_cd# AND MID_CD=#mid_cd# AND IDX=#idx#
+	</delete>
+	
+	<!-- 해당 안전관리 마스터 리스트 삭제 -->
+	<delete id="safe_chk_result_dDelete">
+		DELETE FROM 
+			hwinmm.dbo.chk_result_d
+		WHERE IDX=#idx#
+	</delete>	
+	
+	
+	<!-- /////////////////////////////////작업 기준///////////////////////////////// -->
+	
+	<!-- 작업기준 메뉴 리스트 -->
+	<select id="workMenuList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			kind_cd
+			,kind_nm
+		FROM Man_kind_info
+	</select>	
+		
+	<!-- 작업기준 리스트 -->
+	<select id="workStandardList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			manual_key
+			,manual_kind
+			,convert(varchar, manual_time, 23) AS manual_time			
+			,manual_title
+			,hit_count
+			,user_id
+			,file_nm
+			,file_size
+			,fac_cd			
+		FROM dbo.Manual_info
+		WHERE MANUAL_KIND=#manual_kind#
+		<trim prefix="and">
+			<if test ='nm == "title"'>
+				file_nm like '%'+ #keyword# +'%'
+			</if>				
+			<if test ='search == "title"'>
+				manual_title like '%'+ #keyword# +'%'
+			</if>								
+		</trim>  	
+	</select>	
+	
+	
+	<!-- ///////////////////////////////// 자율상호주의  ///////////////////////////////// -->
+	
+	<!-- 불완전한 행동유형 리스트 -->
+	<select id="base_unact_code" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT * FROM BASE_UNACT_CODE()
+		<trim prefix = "where">
+			<if test = "unact_cd !=null">
+				UNACT_CD=#unact_cd#
+			</if>
+		</trim>		
+	</select>	
+	
+	<!-- 자율상호주의 목록 -->
+	<select id="peerLoveCardList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			peer_key
+			,convert(varchar, peer_date, 23) AS peer_date
+			,peer_id
+			,peer_nm
+			,user_sosok	as peer_sosok
+			,unact_cd
+			,peer_etc
+			,input_id
+			,input_nm
+		FROM PEER_LOVE_LIST() A
+		LEFT OUTER JOIN INSA_INFO() AS B ON A.peer_id = B.user_no
+		WHERE a.peer_date between #sdate# and #edate#
+		<trim prefix = "and">
+			<if test = "peer_key != null">
+				PEER_KEY=#peer_key#
+			</if>
+		</trim>
+	ORDER BY peer_date DESC		
+	</select>
+	
+	<!-- 자율상호주의 목록 -->
+	<select id="peerLoveCardListDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			peer_key
+			,convert(varchar, peer_date, 23) AS peer_date
+			,peer_id
+			,peer_nm
+			,user_sosok	as peer_sosok
+			,unact_cd
+			,peer_etc
+			,input_id
+			,input_nm
+		FROM PEER_LOVE_LIST() A
+		LEFT OUTER JOIN INSA_INFO() AS B ON A.peer_id = B.user_no
+		<trim prefix = "where">
+			<if test = "peer_key != null">
+				PEER_KEY=#peer_key#
+			</if>
+		</trim>
+	ORDER BY peer_date DESC		
+	</select>	
+	<!-- 자율상호주의 작성 -->
+	<insert id="peerLoveCardWrite" parameterType="java.util.HashMap">
+		<selectKey keyProperty="peer_key" resultType="int">
+			select
+			ISNULL(max(peer_key)+1,1) as IDX
+			FROM peer_love_info
+		</selectKey>
+		INSERT INTO peer_love_info
+			(peer_key
+			,peer_date
+			,peer_per
+			,unact_cd
+			,peer_etc
+			,input_id
+			,input_date)
+		VALUES(
+			#peer_key#
+			,#peer_date#
+			,#peer_per#
+			,#unact_cd#
+			,#peer_etc#
+			,#writer_sabun#
+			,getdate())
+	</insert>	
+
+	<!-- 자율상호주의 수정 -->
+	<update id="peerLoveCardUpdate" parameterType="java.util.HashMap">
+		UPDATE 
+		peer_love_info SET
+			PEER_PER=#peer_per#
+			,PEER_DATE=#peer_date#
+			,UNACT_CD=#unact_cd#
+			,PEER_ETC=#peer_etc#
+			,INPUT_ID=#writer_sabun#
+			,input_date=getdate()
+		WHERE PEER_KEY=#peer_key#
+	</update>
+	
+	<!-- 자율상호주의 삭제 -->
+	<delete id="peerLoveCardDelete">
+		DELETE FROM 
+			peer_love_info
+		WHERE PEER_KEY=#peer_key#
+	</delete>	
+	
+</mapper>

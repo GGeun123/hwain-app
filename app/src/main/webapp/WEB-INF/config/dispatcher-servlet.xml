@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:context="http://www.springframework.org/schema/context" 
+	xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context-3.0.xsd
+       http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd
+	   http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd">
+       
+    <!-- Component(Controller / Service / Repository) auto scan -->
+    <!-- <context:component-scan base-package="com" />     -->
+
+    <!-- DAO -->
+    <bean id="restAPIDAO" class="com.api.rest.dao.RestAPIDAOImpl">
+		<property name="SqlSessionTemplate" ref="SqlSessionTemplate"/>
+    </bean>
+    
+    
+    <!-- Service Delegate -->    
+	<bean id="restAPIService" class="com.api.rest.dao.RestAPIServiceImpl">
+		<property name="restAPIDAO">
+			<ref bean="restAPIDAO"/>
+		</property>	
+	</bean>
+    
+    
+    <!-- resources -->   
+	<bean id="RestAPIController" class="com.api.rest.controller.RestAPIController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>
+	
+	<bean id="boardController" class="com.api.rest.controller.BoardController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>
+	
+	<bean id="safeController" class="com.api.rest.controller.SafeController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>	
+	
+	<bean id="WebController" class="com.api.rest.controller.WebController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>		
+	<bean id="LoginController" class="com.api.rest.controller.LoginController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>		
+	<bean id="PersonnelController" class="com.api.rest.controller.PersonnelController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>			
+	<bean id="GearController" class="com.api.rest.controller.GearController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>			
+	<bean id="CommonController" class="com.api.rest.controller.CommonController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>			
+	<bean id="StatusController" class="com.api.rest.controller.StatusController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>
+	<bean id="DrivingLogController" class="com.api.rest.controller.DrivingLogController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>	
+	</bean>
+	<bean id="TireLogController" class="com.api.rest.controller.TireLogController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>
+	</bean>
+	<bean id="AnalysisController" class="com.api.rest.controller.AnalysisController">
+		<property name="restAPIService">
+			<ref bean="restAPIService"/>
+		</property>
+	</bean>
+  	
+  	<context:property-placeholder	location="/property/db.properties" />
+  	
+    <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource" destroy-method="close">
+		<property name="driverClassName" value="${db.driver}"/>
+        <property name="url" value="${db.url}"/>
+        <property name="username" value="${db.user}"/>
+        <property name="password" value="${db.passwd}"/>
+        <property name="testOnBorrow" value="true"/>
+        
+	    <property name="validationQuery" value="select 1" />
+	    <property name="initialSize" value="15" />
+	    <property name="maxActive" value="15" />
+	    <property name="maxIdle" value="15" />	        
+    </bean>   
+    
+    <!-- iBatis Config -->   
+    <bean id="SqlSession" class="org.springframework.orm.ibatis.SqlSessionFactoryBean">
+    	<property name="dataSource" ref="dataSource"/>
+    	<property name="configLocation" value="WEB-INF/configuration.xml"/>
+    </bean>
+	
+	<bean id="SqlSessionTemplate" class="org.springframework.orm.ibatis.SqlSessionTemplate">
+    	<property name="SqlSession" ref="SqlSession"/>
+    </bean>
+  
+  	<!-- MappingJacksonJsonView 설정 -->
+  	<!-- BeanNameViewResolver -->
+    <bean id="jsonView" class="org.springframework.web.servlet.view.json.MappingJacksonJsonView"/>
+
+	<!-- ViewResolver -->
+     
+	<!-- 메서드 이름을 받기 위한 부분 -->
+	<bean id="methodNameResolver" class="org.springframework.web.servlet.mvc.multiaction.ParameterMethodNameResolver">
+		<property name="paramName">
+		
+		<!-- ex) mode=login (로그인 이라는 메서드로 보냄) -->
+		<!-- memberAtcion.do?mode=login -->
+			<value>mode</value>
+		</property>
+	</bean>     
+	
+	<bean class="org.springframework.web.servlet.view.BeanNameViewResolver">
+	     <property name="order" value="0" />
+	</bean>
+	
+	<bean id="viewResolver"
+		class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+		<property name="prefix" value="/WEB-INF/view/" />
+		<property name="suffix" value=".jsp" />
+		<property name="order" value="1" />
+	</bean>
+	
+	<!-- 트랜잭션 -->
+	 <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+	       <property name="dataSource" ref="dataSource"/>
+	</bean>
+	
+	<aop:config proxy-target-class="true">
+		<aop:pointcut id="serviceOperation" expression="execution(* com.api.rest.dao.RestAPIService.*(..))" />
+		<aop:advisor id="transactionAdvisor" pointcut-ref="serviceOperation" advice-ref="txAdvice"/>
+	</aop:config>
+		
+	<tx:advice id="txAdvice" transaction-manager="transactionManager">
+		<tx:attributes>
+			<tx:method name="*Control" rollback-for="Exception"/>
+			<tx:method name="*Insert" rollback-for="Exception"/>
+			<tx:method name="*Modify" rollback-for="Exception"/>
+			<tx:method name="*Delete" rollback-for="Exception"/>
+		</tx:attributes>
+	</tx:advice>
+	
+	<bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver"> 
+		<property name="maxUploadSize" value="20000000" /> 
+		<property name="defaultEncoding" value="UTF-8"></property>
+	</bean>
+
+</beans>

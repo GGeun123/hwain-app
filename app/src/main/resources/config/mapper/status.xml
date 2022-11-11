@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="status">
+
+	
+	<select  id="trans_status_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_TRS_View1 (#sdate#) }
+		]]>
+	</select>
+
+	<select  id="trans_result_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_TRS_View2 (#sdate#) }
+		]]>
+	</select>
+
+	<select  id="trans_result_modal_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_TRS_View3 (#stdate#,#edate#) }
+		]]>
+	</select>
+	<select  id="repair_day_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_MNT_View1_New (#sdate#,#schk#) }
+		]]>
+	</select>
+	<select  id="repair_day_save_ajax" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TM0659_INSERT (#jdate#,#num#,#jgubun#,#idate#,#edate#,#gubun#) }
+		]]>
+	</select>
+	
+	
+	
+	
+	<select  id="repair_self_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_MNT_View2 (#sdate#) }
+		]]>
+	</select>
+	<select  id="repair_self_modal_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_MNT_View3 (#stdate#,#edate#,#gubun#,#num#) }
+		]]>
+	</select>
+	
+	<select  id="materi_status_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_ITM_View1 (#sdate#) }
+		]]>
+	</select>
+	<select  id="materi_cost_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_ITM_View2 (#sdate#) }
+		]]>
+	</select>
+	<select  id="materi_lack_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_ITM_View3 (#sdate#) }
+		]]>
+	</select>
+	<select  id="safe_status_list" resultType="java.util.HashMap">
+		<![CDATA[
+		{ call Hwinmm.dbo.sp_TW_SAF_View1 (#sdate#) }
+		]]>
+	</select>
+	<select id="mob_jajae_accounts" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT 
+			L_LEV_CD
+			,L_LEV_NM,
+			CASE WHEN
+			 M_LEV_CD = '' THEN 'ZZZZZ' 
+			 ELSE M_LEV_CD END M_LEV_CD
+			 ,M_LEV_NM
+			 ,BEF_MNY
+			 ,IN_MNY
+			 ,OUT_MNY
+			 ,JEGO_MNY
+			
+			 FROM DBO.MOB_JAJAE_ACCOUNTS(#sdate#, #edate#) 
+			WHERE L_LEV_CD=#jajae_cd#
+			ORDER BY 1,3	
+			
+	</select>
+
+	<select id="mob_jajae_inout" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT 
+			*
+			 FROM DBO.MOB_JAJAE_INOUT(#sdate#, #edate#,#pno#) 
+			ORDER BY 1,5	
+			
+	</select>
+	
+
+	<select id="base_jepum_info" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		
+		SELECT * FROM BASE_JEPUM_INFO() where  jepum_nm !=''
+			
+	</select>
+	
+	<!-- 자재 불출 리스트-->
+	<select id="mob_jajae_outlist" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT * FROM MOB_JAJAE_OUTLIST(#sdate#, #edate#)		
+	</select>	
+	
+	<!-- 자재불출 검색1 리스트-->
+	<select id="materialSearch" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT * FROM BASE_JEPUM_INFO()
+		<trim prefix="where">
+			<if test = 'gunub == "cd"'>
+				jepum_cd like '%'+ #param# +'%'
+			</if>
+			<if test = 'gunub == "nm"'>
+				jepum_nm like '%'+ #param# +'%'
+			</if>
+			<if test = 'gunub == "kind"'>
+				jepum_kind like '%'+ #param# +'%'
+			</if>						
+		</trim>		
+	</select>	
+	
+	<select id="searchDialog2" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT * FROM INSA_INFO('','')
+		<trim prefix="where">
+			<if test = 'gunub == "cd"'>
+				user_no like '%'+ #param# +'%'
+			</if>
+			<if test = 'gunub == "nm"'>
+				user_nm like '%'+ #param# +'%'
+			</if>					
+		</trim>		
+	</select>	
+	
+	<!-- 자재불출 검색3 리스트-->
+	<select id="searchDialog3" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			C001
+			,C002
+		FROM HWINMM.DBO.TM0265
+		<trim prefix="where">
+			<if test = 'gunub == "cd"'>
+				C001 like '%'+ #param# +'%'
+			</if>
+			<if test = 'gunub == "nm"'>
+				C002 like '%'+ #param# +'%'
+			</if>					
+		</trim>
+	</select>		
+	
+	<!-- 자재불출 검색4 리스트-->
+	<select id="searchDialog4" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			C001
+			,C002
+		FROM HWINMM.DBO.TM0121
+		<trim prefix="where">
+			<if test = 'gunub == "cd"'>
+				C001 like '%'+ #param# +'%'
+			</if>
+			<if test = 'gunub == "nm"'>
+				C002 like '%'+ #param# +'%'
+			</if>					
+		</trim>		
+	</select>		
+	
+	<!-- 자재불출현황 작성 -->
+	<insert id="materialWrite" parameterType="java.util.HashMap">
+		<selectKey keyProperty="idx" resultType="int">
+			select
+			ISNULL(max(C002)+1,1) as IDX
+			FROM Hwinmm.dbo.TM0272
+			where C001=#input_date#
+		</selectKey> 	
+		INSERT INTO HWINMM.DBO.TM0272 
+			(C001,C002,C003,C004,C005,C010,C011,C012,C013,C888, C999, C022, C025)
+		VALUES (
+			#input_date#
+			,#idx#
+			,#p_no#
+			,'00'
+			,#bul_qty#
+			,'2'
+			,#writer_sabun#
+			,#rec_nm#
+			,'1'
+			,'10-00'
+			,'10-00'
+			,#gear_cd#
+			,#equip_cd#)
+	</insert>		
+</mapper>

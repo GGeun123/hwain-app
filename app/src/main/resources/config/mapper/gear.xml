@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="gear">
+
+	<!-- 장비 구분 차종 카테고리 -->
+	<select id="gearGubunList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT * FROM GEAR_GUBUN()
+		order by C003
+	</select>
+	
+	<!-- 장비 구분 차량 카테고리 -->
+	<select id="gearInfoList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			gear_cd
+			,gear_nm
+			,make_comp
+			,case when driver_nm is null then '' else driver_nm end as driver_nm
+			,driver_no		
+		FROM TW_GEAR_INFO(#gear_cd#)
+	</select>
+	
+	<!-- 해당 장비 운전자 -->
+	<select id="gearDriver" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			sabun = rtrim(c001)
+			,user_nm = rtrim(C002) 
+		from hpublic00.dbo.t0201 
+		where C012='1' and C070 in (select C001 from hpublic00.dbo.TP0122 where C003='1')
+		<trim prefix="and">
+			<if test="search == 'user_nm'">
+				C002 like '%'+ #keyword# +'%'
+			</if>
+			<if test="search == 'user_no'">
+				C001 like '%'+ #keyword# +'%'
+			</if>						
+		</trim>		
+	</select>	
+	
+	<!-- 해당 장비 메인 리스트 윗부분 정보 -->
+	<select id="gear_m_info" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			car_no
+			,gear_cd
+			,car_inday
+			,replace( convert( VARCHAR, convert( MONEY, floor(car_use) ), 1 ), '.00', '' ) car_use
+		FROM TW_GEAR_M_INFO(#gear_cd#)	
+	</select>
+	
+	<!-- 해당 장비 메인 날짜별 리스트 정보 -->
+	<select id="gear_d_info" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select 
+			B.C002 AS DATES
+			,C.C002 + ' / ' + CONVERT(VARCHAR, A.C005) AS etc
+			,CASE WHEN (SELECT COUNT(*) FROM Hwinmm.dbo.MV1111 Z1 LEFT OUTER JOIN Hwinmm.dbo.MV1110 Z2 ON Z1.C001 = Z2.C001 AND Z1.C002 = Z2.C002 AND Z1.C017 = Z2.C013 WHERE A.M_IDX = Z2.TM0661A_M_IDX AND A.C001 = Z2.TM0661A_C001 AND Z1.C012 = '1') > 0 THEN '의뢰'
+				WHEN (SELECT COUNT(*) FROM Hwinmm.dbo.MV1111 Z1 LEFT OUTER JOIN Hwinmm.dbo.MV1110 Z2 ON Z1.C001 = Z2.C001 AND Z1.C002 = Z2.C002 AND Z1.C017 = Z2.C013 WHERE A.M_IDX = Z2.TM0661A_M_IDX AND A.C001 = Z2.TM0661A_C001 AND Z1.C012 IN ('2', '6')) > 0 THEN '정비'
+			ELSE '점검'
+			END AS STATUS
+		from Hwinmm.dbo.TM0661A A
+		LEFT OUTER JOIN Hwinmm.dbo.TM0661 B ON A.M_IDX=B.IDX
+		LEFT OUTER JOIN Hwinmm.dbo.TM0653 C ON A.C001=C.C001
+		where B.C001=#gear_cd# AND A.C002!='Y' AND A.C003!=1
+			and B.C002 BETWEEN REPLACE(CONVERT(VARCHAR(10), DATEADD(MONTH, -1, GETDATE()), 120), '-', '.') AND REPLACE(CONVERT(VARCHAR(10), GETDATE(), 120), '-', '.')
+		order by B.C002 DESC
+	</select>
+	
+	<!-- 해당 장비 점검 항목 리스트 -->
+	<select id="gearCheckList" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT * FROM TW_GEAR_CHECK(#gear_cd#)
+	</select>
+	
+	<!-- 최근 날짜 장비 점검 체크 -->
+	<select id="gearCheckDate" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			C001
+			,max(C007) as input_date
+		FROM Hwinmm.dbo.TM0661
+		GROUP BY C001
+		HAVING C001=#gear_cd#
+	</select>
+	
+	<!-- 최근 날짜 점검 항목의 chr_rst_cd 리스트 -->
+	<select id="gearCheckListRstCd" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			IDX
+			,A.C001 as gear_cd
+			,A.C002 as input_date
+			,A.C003 as writer_sabun
+			,A.LOGIN_NO as login_sabun
+			,B.C001 as check_cd
+			,C.C002 as check_nm
+			,B.C002 as chk_rst
+			,B.C003 as chk_rst_cd
+			,B.C005 as etc
+			,D.C003 as check_unit
+			,D.C004 as check_schej
+		    ,D.C005 as check_start
+		from Hwinmm.dbo.TM0661 A
+		LEFT OUTER JOIN Hwinmm.dbo.TM0661A B ON A.IDX=B.M_IDX
+		LEFT OUTER JOIN Hwinmm.DBO.TM0653 C ON C.C001=B.C001
+		LEFT OUTER JOIN Hwinmm.DBO.TM0265A D ON D.C002=C.C001 AND D.C001=A.C001
+		where A.C001=#gear_cd# and A.C007=#input_date#
+	</select>	
+	
+	<!-- 오늘 날짜 장비 점검 항목 리스트 (중간 저장개념) -->
+	<select id="gearCheckListLoad" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			IDX
+			,A.C001 as gear_cd
+			,A.C002 as input_date
+			,A.C003 as writer_sabun
+			,A.LOGIN_NO as login_sabun
+			,B.C001 as check_cd
+			,C.C002 as check_nm
+			,B.C002 as chk_rst
+			,B.C003 as chk_rst_cd
+			,B.C005 as etc
+			,D.C003 as check_unit
+			,D.C004 as check_schej
+		    ,D.C005 as check_start
+		from Hwinmm.dbo.TM0661 A
+		LEFT OUTER JOIN Hwinmm.dbo.TM0661A B ON A.IDX=B.M_IDX
+		LEFT OUTER JOIN Hwinmm.DBO.TM0653 C ON C.C001=B.C001
+		LEFT OUTER JOIN Hwinmm.DBO.TM0265A D ON D.C002=C.C001 AND D.C001=A.C001
+		where A.C001=#gear_cd# and A.C007=#input_date# and A.LOGIN_NO=#loginSabun#
+	</select>
+	
+	<!-- 저장항목 + 기본 항목 -->
+	<select id="gearCheckListLoad2" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		WITH BASE AS (
+			SELECT
+				IDX
+				,A.C001 as gear_cd
+				,A.C002 as input_date
+				,A.C003 as writer_sabun
+				,A.LOGIN_NO as login_sabun
+				,B.C001 as check_cd
+				,C.C002 as check_nm
+				,B.C002 as chk_rst
+				,B.C003 as chk_rst_cd
+				,B.C005 as etc
+				,D.C003 as check_unit
+				,D.C004 as check_schej
+				,D.C005 as check_start
+			FROM Hwinmm.dbo.TM0661 A
+			LEFT OUTER JOIN Hwinmm.dbo.TM0661A B ON A.IDX=B.M_IDX
+			LEFT OUTER JOIN Hwinmm.DBO.TM0653 C ON C.C001=B.C001 
+			LEFT OUTER JOIN Hwinmm.DBO.TM0265A D ON D.C002=C.C001 AND D.C001=A.C001
+			WHERE A.C001=#gear_cd#
+				AND A.C007=#input_date#
+				AND A.LOGIN_NO=#loginSabun#
+		)
+		SELECT *
+		FROM (
+			SELECT *
+			FROM BASE
+			UNION ALL
+			SELECT
+				(SELECT DISTINCT IDX FROM BASE) AS IDX
+				,A.EQUIP_CD AS GEAR_CD
+				,(SELECT DISTINCT INPUT_DATE FROM BASE) AS INPUT_DATE
+				,(SELECT DISTINCT WRITER_SABUN FROM BASE) AS WRITER_SABUN
+				,(SELECT DISTINCT LOGIN_SABUN FROM BASE) AS LOGIN_SABUN
+				,A.CHECK_CD AS CHECK_CD
+				,A.CHECK_NM AS CHECK_NM
+				,A.CHK_RST AS CHK_RST
+				,A.CHK_RST_CD AS CHK_RST_CD
+				,A.ETC AS ETC
+				,A.CHECK_UNIT AS CHECK_UNIT
+				,A.CHECK_SCHEJ AS CHECK_SCHEJ
+				,A.CHECK_START
+			FROM SJ_SMARTFDB.DBO.TW_GEAR_CHECK(#gear_cd#) A
+			WHERE NOT EXISTS (SELECT B.CHECK_CD FROM BASE B WHERE A.CHECK_CD = B.CHECK_CD)
+		) T1
+		ORDER BY CHECK_CD
+	</select>
+	
+	<!-- 장비 점검 작성 시 '아니오' 선택 문구 -->
+	<select id="gear_result_info" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT * FROM GEAR_RESULT_INFO()
+	</select>	
+	
+	<!-- 장비 점검 작성 시 중복 데이터 있는지 카운트 -->
+	<select id="gearCheckInsertCount" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT 
+			IDX
+			,COUNT(*) AS CNT 
+		FROM Hwinmm.dbo.TM0661
+		WHERE C001=#gear_cd# AND C002=#input_date#
+		group by IDX
+	</select>	
+	
+	<!-- 장비 점검 마스터 작성 -->
+	<insert id="gearCheckMasterInsert" parameterType="java.util.HashMap">
+		<selectKey keyProperty="idx" resultType="int">
+			select
+			ISNULL(max(IDX)+1,1) as IDX
+			FROM Hwinmm.dbo.TM0661
+		</selectKey>
+		INSERT INTO Hwinmm.dbo.TM0661 
+			(C001, C002, C003, C004, C005, C006, C007, LOGIN_NO) 
+		VALUES (
+			#gear_cd#
+			,#input_date#
+			,#writer_sabun#
+			,''
+			,''
+			,''
+			,getdate()
+			,#loginSabun#)
+	</insert>
+	
+	<!--해당 장비점검 마스터 IDX-->
+	<select id="get_gear_idx" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select ident_current('hwinmm.dbo.TM0661') IDX
+	</select>		
+	
+	<!-- 장비 점검 작성 -->
+	<insert id="gearCheckInsert" parameterType="java.util.HashMap">
+		INSERT INTO Hwinmm.dbo.TM0661A 
+			(M_IDX, C001, C002, C003, C004, C005) 
+		VALUES (
+			#idx#
+			,#check_cd#
+			,#chk_rst#
+			,#chk_rst_cd#
+			,''
+			,#etc#)
+	</insert>
+	
+	<!-- 장비 점검 중복시 수정 -->
+	<update id="gearCheckUpdate" parameterType="java.util.HashMap">
+			UPDATE 
+			Hwinmm.dbo.TM0661A SET
+				C001=#check_cd#
+				,C002=#chk_rst#
+				,C003=#chk_rst_cd#
+				,C005=#etc#
+			WHERE M_IDX=#idx# AND C001=#check_cd#
+	</update>	
+	
+	<!-- 장비 점검 삭제 -->
+	<delete id="gearCheckDelete" parameterType="java.util.HashMap">
+		DELETE FROM 
+			Hwinmm.dbo.TM0661
+		WHERE C001=#gear_cd# AND C002=#input_date#
+	</delete>
+	
+	<delete id="gearCheckDetailDelete" parameterType="java.util.HashMap">
+		DELETE FROM 
+			Hwinmm.dbo.TM0661A
+		WHERE M_IDX=#key#
+	</delete>
+	
+	<!-- 해당장비 이력 마스터 -->
+	<select id="gearCheckHistoryMaster" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			DISTINCT(정비항목명)
+			,Rtrim(정비항목코드) AS 정비항목코드
+		FROM TW_GEAR_HISTORY_INFO (#gear_cd#,#sdate#,#edate#)
+		where 정비항목명 IS NOT NULL
+		ORDER BY 정비항목코드
+	</select>
+	
+	<!-- 해당장비 이력 디테일 -->
+	<select id="gearCheckHistoryDetail" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			정비일자
+			,정비항목코드
+			,정비항목명
+			,정비내용세부
+			,replace( convert( VARCHAR, convert( MONEY, round(가동시간누계,0) ), 1 ), '.00', '' ) 가동시간누계	
+		FROM TW_GEAR_HISTORY_INFO (#gear_cd#,#sdate#,#edate#)
+		where 정비항목명 IS NOT NULL AND 정비항목코드=#gear_item#
+		order by 정비일자 DESC
+	</select>	
+	
+	<!-- 트랜잭션 테스트 쿼리 -->
+	<insert id="queryTest" parameterType="java.util.HashMap">
+		INSERT INTO board_simple_app
+			(board)
+		VALUES(
+			'test')
+	</insert>	
+
+</mapper>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE configuration
+    PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+    "https://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+	
+  <!-- Configure a built-in transaction manager.  If you're using an 
+       app server, you probably want to use its transaction manager 
+       and a managed datasource -->
+
+<!-- List the SQL Map XML files. They can be loaded from the 
+	classpath, as they are here (com.domain.data...) -->
+	<environments default="development">
+    <environment id="development">
+      <transactionManager type="JDBC"/>
+      <dataSource type="UNPOOLED">
+        <property name="driver" value="com.microsoft.sqlserver.jdbc.SQLServerDriver"/>
+        <property name="url" value="jdbc:sqlserver://119.202.61.144:1455;databaseName=SJ_SmarTFDB"/>
+        <property name="username" value="sa"/>
+        <property name="password" value="7654"/>
+      </dataSource>
+    </environment>
+  </environments>
+<mappers>
+<!-- 여러 이름의 xml을 쓰기 위한부분 -->
+<!-- <settings useStatementNamespaces="true"/> -->
+	<mapper resource="/app/src/main/resources/static/mappers/template.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/board.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/safe.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/login.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/personnel.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/gear.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/common.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/status.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/drivingLog.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/tireLog.xml"/>
+	<mapper resource="/app/src/main/resources/static/mappers/analysis.xml"/>
+</mappers>
+</configuration>
+
+
+
+

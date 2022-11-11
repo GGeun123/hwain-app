@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="login">
+	
+	<select id="sid_check_ajax" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select * from SJ_SmartFDB.dbo.login_info(#sid#)	
+<!-- 	SELECT A.C002 as user_nm, RTRIM(B.C002) + ' ' + RTRIM(C.C003) AS buseo_nm
+		  ,A.C005 as j_pos
+		  ,A.C004 as part1_cd
+		  ,A.C069 as part2_cd			  
+		  FROM HPUBLIC00.DBO.T0201 A
+		  LEFT OUTER JOIN HPUBLIC00.DBO.T0102 AS B ON A.C004 = B.C001
+		  LEFT OUTER JOIN HPUBLIC00.DBO.TP0123A AS C ON A.C004 = C.C001 AND A.C069 = C.C002
+		WHERE A.C001 = '00114'
+-->
+	</select>
+	
+	<select id="sid_login_check_ajax" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select * from SJ_SmartFDB.dbo.login_ok(#sid#,#password#)
+<!-- 		SELECT 
+			C001 AS user_id
+		FROM f_HPUBLIC00.DBO.TP0902
+		 WHERE C003=#sid# AND C002=#password# -->
+	</select>
+	
+	<select id="login_check_logic" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		SELECT
+			C003 sabun_no
+			,C002 user_pw
+		FROM HPUBLIC00.DBO.TP0902
+		WHERE C003=#sid#
+	</select>	
+	
+	
+	<select id="searchUserData" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+<!-- 		SELECT 
+			A.C002 as user_nm
+			, RTRIM(B.C002) + ' ' + RTRIM(C.C003) AS buseo_nm
+			,A.C001 as sabun_no
+		FROM f_HPUBLIC00.DBO.T0201 A
+		LEFT OUTER JOIN f_HPUBLIC00.DBO.T0102 AS B ON A.C004 = B.C001
+		LEFT OUTER JOIN f_HPUBLIC00.DBO.TP0123A AS C ON A.C004 = C.C001 AND A.C069 = C.C002 -->
+
+			SELECT
+			   user_no,
+			   user_nm, 
+			   user_cell,
+			   user_pic,
+			   user_email,
+			   user_sosok
+			FROM INSA_INFO()
+		<trim prefix="where">
+			<if test="gubun == 'user_nm'">
+				user_nm like '%'+ #param# +'%'
+			</if>
+			<if test="gubun == 'sabun_no'">
+				user_no like '%'+ #param# +'%'
+			</if>					
+		</trim>
+		order by user_no	
+	</select>
+	
+	<select id="getBeaconSetting" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		
+		SELECT
+			bc_search_dist,
+			beacon_id,
+			cross_warn_dist
+		FROM HWINMM.DBO.BEACON_SETTING
+		<if test="beacon_id == '0'">
+		WHERE beacon_id=#beacon_id#
+		</if>
+		<if test="beacon_id == '0'">
+		<![CDATA[
+		WHERE beacon_id <> '0'
+		]]>
+		</if>
+		
+	</select>
+		
+</mapper>
