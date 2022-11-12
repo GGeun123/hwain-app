@@ -49,6 +49,7 @@ dependencies {
 	compileOnly 'javax.servlet:javax.servlet-api:4.0.1'
 	implementation 'org.json:json:20220924'
 	implementation 'com.sun.jersey:jersey-client:1.19.4'
+	//implementation 'javax.servlet.jsp.jstl:jstl:1.2'
 }
 
 tasks.named('test') {
